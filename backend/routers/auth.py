@@ -138,14 +138,14 @@ def register(user_in: UserCreate, response: Response, db = Depends(get_db)):
     # Generate token with user_id and role
     token = create_access_token(data={"sub": db_user.email, "role": db_user.role, "user_id": db_user.id})
     
-    # Set cookie
+    # Set cookie (secure + samesite=none required for cross-domain)
     response.set_cookie(
         key="access_token",
         value=token,
         httponly=True,
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        samesite="lax",
-        secure=False  # True in production
+        samesite="none",
+        secure=True
     )
     
     return db_user
@@ -164,17 +164,19 @@ def login(user_in: UserLogin, response: Response, db = Depends(get_db)):
     # Generate token with user_id and role
     token = create_access_token(data={"sub": user.email, "role": user.role, "user_id": user.id})
     
-    # Set HTTP-only cookie
+    # Set HTTP-only cookie (secure + samesite=none required for cross-domain)
     response.set_cookie(
         key="access_token",
         value=token,
         httponly=True,
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        samesite="lax",
-        secure=False  # True in production
+        samesite="none",
+        secure=True
     )
     
     return {
+        "access_token": token,
+        "token_type": "bearer",
         "user_id": user.id,
         "email": user.email,
         "full_name": user.full_name,

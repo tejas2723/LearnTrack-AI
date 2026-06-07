@@ -1,10 +1,20 @@
 import axios from "axios";
 
-// Create Axios client pointing to FastAPI server
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api",
-  withCredentials: true, // Send HTTP-only cookies with every request
-  timeout: 30000, // 30s timeout for slow Atlas queries (ML predictions, seeding)
+  withCredentials: true,
+  timeout: 30000,
+});
+
+// Attach token from localStorage as Authorization header on every request
+api.interceptors.request.use((config) => {
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      config.headers["Authorization"] = `Bearer ${token}`;
+    }
+  }
+  return config;
 });
 
 // Global interceptor: only redirect to /auth/login on true 401 Unauthorized
@@ -12,7 +22,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 && typeof window !== "undefined") {
-      // Only redirect if not already on an auth page
+      localStorage.removeItem("access_token");
       if (!window.location.pathname.startsWith("/auth")) {
         window.location.href = "/auth/login";
       }

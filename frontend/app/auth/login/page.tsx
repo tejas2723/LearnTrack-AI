@@ -22,7 +22,12 @@ export default function LoginPage() {
 
     try {
       const res = await api.post("/auth/login", { email, password });
-      const { role } = res.data;
+      const { role, access_token } = res.data;
+      
+      // Save token to localStorage for cross-domain auth
+      if (access_token) {
+        localStorage.setItem("access_token", access_token);
+      }
       
       // Redirect based on backend role
       if (role === "student") {
