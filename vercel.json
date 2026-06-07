@@ -1,5 +1,5 @@
 {
-  "version": 2,
-  "buildCommand": "cd frontend && npm install && npm run build && mv out ../public",
-  "outputDirectory": "public"
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/out",
+  "framework": null
 }

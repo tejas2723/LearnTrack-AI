@@ -7,7 +7,7 @@ const __dirname = path.dirname(__filename);
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     output: "export",
-    // Force tracing to stay inside the frontend folder, ignoring the massive backend venv above it
+    trailingSlash: true,
     experimental: {
         outputFileTracingRoot: __dirname,
     }
