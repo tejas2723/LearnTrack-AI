@@ -1,0 +1,25 @@
+# Node modules
+node_modules/
+frontend/node_modules/
+
+# Next.js build output
+.next/
+frontend/.next/
+out/
+
+# Python cache and environments
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.env
+.venv/
+
+# IDE files
+.vscode/
+.idea/
+
+# Database / uploads
+*.db
+uploads/
