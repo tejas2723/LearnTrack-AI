@@ -64,7 +64,19 @@ async def get_current_user(request: Request, db = Depends(get_db)) -> User:
     user_dict = db.users.find_one({"email": email})
     if user_dict is None:
         raise credentials_exception
-    return User(**user_dict)
+    user = User(**user_dict)
+    if user.role == "student":
+        if user.status == "Pending":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your account is pending admin approval."
+            )
+        elif user.status == "Rejected":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your registration request was rejected by the admin."
+            )
+    return user
 
 # Role dependencies
 async def require_role(required_roles: list[str], current_user: User = Depends(get_current_user)) -> User:
@@ -128,7 +140,8 @@ def register(user_in: UserCreate, response: Response, db = Depends(get_db)):
         "predicted_score": 70,
         "risk_level": "Low",
         "preferred_style": "Practice-based learning",
-        "is_active": True,
+        "status": "Pending" if user_in.role == "student" else "Approved",
+        "is_active": False if user_in.role == "student" else True,
         "created_at": datetime.now()
     }
     
@@ -160,6 +173,17 @@ def login(user_in: UserLogin, response: Response, db = Depends(get_db)):
         )
         
     user = User(**user_dict)
+    if user.role == "student":
+        if user.status == "Pending":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your account is pending admin approval."
+            )
+        elif user.status == "Rejected":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your registration request was rejected by the admin."
+            )
     
     # Generate token with user_id and role
     token = create_access_token(data={"sub": user.email, "role": user.role, "user_id": user.id})

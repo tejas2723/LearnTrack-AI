@@ -33,9 +33,107 @@ def get_admin_stats(
     total_teachers = sum(1 for u in users if u.get("role") == "teacher")
     total_admins = sum(1 for u in users if u.get("role") == "admin")
     total_quizzes = db.quizzes.count_documents({})
+    
+    pending_approvals = sum(1 for u in users if u.get("role") == "student" and u.get("status") == "Pending")
+    approved_students = sum(1 for u in users if u.get("role") == "student" and u.get("status") == "Approved")
 
     results = list(db.results.find({}))
     avg_platform_score = round(sum(r.get("accuracy", 0) for r in results) / len(results), 1) if results else 75.0
+
+    # Subject performance analytics
+    SUBJECTS_KEYS = {
+        "compiler_design": "Compiler Design",
+        "computer_networks": "Computer Networks",
+        "machine_learning": "Machine Learning",
+        "internet_of_things": "Internet of Things",
+        "development_engineering": "Development Engineering",
+        "competitive_programming": "Competitive Programming",
+        "java": "Java",
+        "dbms": "DBMS"
+    }
+
+    quizzes_map = {q["_id"]: q for q in db.quizzes.find({})}
+    subject_performances = []
+    for key, display in SUBJECTS_KEYS.items():
+        sub_results = [
+            r for r in results
+            if quizzes_map.get(r.get("quiz_id"), {}).get("subject", "").lower() == key.lower()
+            or quizzes_map.get(r.get("quiz_id"), {}).get("title", "").lower().replace(" ", "_") == key.lower()
+        ]
+        if sub_results:
+            avg = round(sum(r.get("accuracy", 0) for r in sub_results) / len(sub_results), 1)
+            subject_performances.append({"subject": display, "avg_score": avg})
+
+    # Academic risk category calculations for approved students
+    approved_student_users = [u for u in users if u.get("role") == "student" and u.get("status") == "Approved"]
+    
+    high_risk_students = []
+    medium_risk_students = []
+    low_risk_students = []
+    
+    # Map student_id -> list of results
+    student_results_map = {}
+    for r in results:
+        s_id = r.get("student_id")
+        if s_id not in student_results_map:
+            student_results_map[s_id] = []
+        student_results_map[s_id].append(r)
+        
+    for s in approved_student_users:
+        s_results = student_results_map.get(s["_id"], [])
+        attempts_count = len(s_results)
+        
+        if attempts_count > 0:
+            avg_score = sum(r.get("accuracy", 0.0) for r in s_results) / attempts_count
+        else:
+            avg_score = 0.0
+            
+        if attempts_count == 0:
+            risk_level = "Low"
+        elif avg_score < 40.0:
+            risk_level = "High"
+        elif avg_score <= 70.0:
+            risk_level = "Medium"
+        else:
+            risk_level = "Low"
+            
+        # Weak subjects
+        subject_perf = {}
+        for key in SUBJECTS_KEYS:
+            sub_results = [
+                r for r in s_results
+                if quizzes_map.get(r.get("quiz_id"), {}).get("subject", "").lower() == key.lower()
+                or quizzes_map.get(r.get("quiz_id"), {}).get("title", "").lower().replace(" ", "_") == key.lower()
+            ]
+            if sub_results:
+                subject_perf[key] = sum(r.get("accuracy", 0) for r in sub_results) / len(sub_results)
+                
+        weak_subjects = []
+        for sub, score in subject_perf.items():
+            if score < 70.0:
+                weak_subjects.append(SUBJECTS_KEYS.get(sub, sub.replace("_", " ").title()))
+                
+        student_info = {
+            "id": s["_id"],
+            "name": s.get("full_name", "Unknown"),
+            "email": s.get("email", ""),
+            "department": s.get("department", "N/A"),
+            "attempts_count": attempts_count,
+            "avg_score": round(avg_score, 1),
+            "risk_level": risk_level,
+            "weak_subjects": weak_subjects
+        }
+        
+        if risk_level == "High":
+            high_risk_students.append(student_info)
+        elif risk_level == "Medium":
+            medium_risk_students.append(student_info)
+        else:
+            low_risk_students.append(student_info)
+            
+    high_risk_count = len(high_risk_students)
+    medium_risk_count = len(medium_risk_students)
+    low_risk_count = len(low_risk_students)
 
     role_distribution = [
         {"name": "Students", "value": total_students},
@@ -61,9 +159,7 @@ def get_admin_stats(
 
     # Recent activity feed
     recent_results = list(db.results.find({}).sort("timestamp", -1).limit(10))
-    quiz_ids = [r["quiz_id"] for r in recent_results]
     student_ids = [r["student_id"] for r in recent_results]
-    quizzes_map = {q["_id"]: q for q in db.quizzes.find({"_id": {"$in": quiz_ids}})}
     students_map = {u["_id"]: u for u in db.users.find({"_id": {"$in": student_ids}})}
 
     recent_activity = []
@@ -85,6 +181,17 @@ def get_admin_stats(
         "total_teachers": total_teachers,
         "total_quizzes": total_quizzes,
         "avg_platform_score": avg_platform_score,
+        
+        "pending_approvals": pending_approvals,
+        "approved_students": approved_students,
+        "high_risk_count": high_risk_count,
+        "medium_risk_count": medium_risk_count,
+        "low_risk_count": low_risk_count,
+        "high_risk_students": high_risk_students,
+        "medium_risk_students": medium_risk_students,
+        "low_risk_students": low_risk_students,
+        "subject_performances": subject_performances,
+        
         "role_distribution": role_distribution,
         "registrations_trend": registrations_trend,
         "recent_activity": recent_activity
@@ -291,3 +398,53 @@ def export_results_csv(
     )
     response.headers["Content-Disposition"] = "attachment; filename=platform_student_results.csv"
     return response
+
+@router.get("/pending-students")
+def get_pending_students(
+    db=Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    pending = list(db.users.find({"role": "student", "status": "Pending"}))
+    result = []
+    for p in pending:
+        created = p.get("created_at")
+        result.append({
+            "id": p["_id"],
+            "name": p.get("full_name", ""),
+            "email": p.get("email", ""),
+            "department": p.get("department", "N/A"),
+            "year_semester": p.get("year_semester", "N/A"),
+            "joined_date": created.strftime("%Y-%m-%d") if created else "N/A",
+            "status": p.get("status", "Pending")
+        })
+    return result
+
+@router.post("/students/{id}/approve")
+def approve_student(
+    id: int,
+    db=Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    student = db.users.find_one({"_id": id, "role": "student"})
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    db.users.update_one(
+        {"_id": id},
+        {"$set": {"status": "Approved", "is_active": True}}
+    )
+    return {"message": "Student approved successfully", "id": id}
+
+@router.post("/students/{id}/reject")
+def reject_student(
+    id: int,
+    db=Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    student = db.users.find_one({"_id": id, "role": "student"})
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    db.users.update_one(
+        {"_id": id},
+        {"$set": {"status": "Rejected", "is_active": False}}
+    )
+    return {"message": "Student rejected successfully", "id": id}

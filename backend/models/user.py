@@ -23,6 +23,7 @@ class User(BaseModel):
     preferred_style: str = "Practice-based learning"
     
     role: str = "student" # student, teacher, admin
+    status: str = "Approved" # Approved, Pending, Rejected
     is_active: bool = True
     created_at: datetime = Field(default_factory=datetime.now)
 

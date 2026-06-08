@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from backend.database import get_db
 from backend.models.user import User
@@ -8,6 +8,51 @@ from backend.routers.auth import get_current_user
 from backend.ml.predictor import calculate_student_ml_features, predict
 
 router = APIRouter(prefix="/results", tags=["results"])
+
+@router.get("/my-history")
+def get_my_history(
+    subject: Optional[str] = None,
+    db=Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.role != "student":
+        raise HTTPException(status_code=403, detail="Only students can view their quiz history.")
+        
+    query = {"student_id": current_user.id}
+    results = list(db.results.find(query).sort("timestamp", -1))
+    
+    # Pre-load all quizzes to map subjects
+    quizzes = {q["_id"]: q for q in db.quizzes.find({})}
+    
+    history = []
+    for r in results:
+        quiz = quizzes.get(r["quiz_id"], {})
+        quiz_subject = quiz.get("subject", "unknown")
+        
+        # Subject filter (case insensitive)
+        if subject and subject.lower() != "all" and quiz_subject.lower() != subject.lower():
+            continue
+            
+        accuracy = r.get("accuracy", 0.0)
+        if accuracy > 70.0:
+            perf_level = "High"
+        elif accuracy >= 40.0:
+            perf_level = "Medium"
+        else:
+            perf_level = "Low"
+            
+        history.append({
+            "id": r["_id"],
+            "quiz_id": r["quiz_id"],
+            "quiz_title": quiz.get("title", "Unknown Quiz"),
+            "subject": quiz_subject,
+            "timestamp": r.get("timestamp"),
+            "score": r.get("score", 0),
+            "total_questions": r.get("total_questions", 0),
+            "accuracy": accuracy,
+            "performance_level": perf_level
+        })
+    return history
 
 @router.get("/{result_id}")
 def get_result(
@@ -84,6 +129,7 @@ def get_result(
         "timestamp": ts,
         "quiz_title": quiz.get("title", "Unknown"),
         "attempts": attempts_review,
+        "personalized_suggestions": result.get("personalized_suggestions"),
         "ai_insights": {
             "weak_topics": weak_topics[:3],
             "predicted_score": predicted_grade,

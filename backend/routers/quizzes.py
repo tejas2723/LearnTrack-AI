@@ -276,6 +276,7 @@ def process_quiz_submission(db, quiz: dict, submission, current_user: User):
     }
     db.results.insert_one(result_doc)
 
+    incorrect_questions = []
     for question in questions:
         attempt = attempts_in.get(question["_id"])
         selected_option = attempt.selected_option if attempt else None
@@ -284,6 +285,8 @@ def process_quiz_submission(db, quiz: dict, submission, current_user: User):
         if selected_option and selected_option.lower() == question.get("correct_option", "").lower():
             is_correct = True
             score += 1
+        else:
+            incorrect_questions.append(question)
 
         time_taken_q = attempt.time_taken_seconds if attempt else 60
         confidence = attempt.confidence_level if attempt else None
@@ -305,10 +308,20 @@ def process_quiz_submission(db, quiz: dict, submission, current_user: User):
     active_ratio = (time_taken - idle_time) / time_taken if time_taken > 0 else 1.0
     focus_score = int(max(10, min(100, (active_ratio * 75) + (accuracy / 100 * 25))))
 
+    # Generate personalized suggestions
+    personalized_suggestions = generate_personalized_suggestions(
+        accuracy, quiz.get("subject", ""), incorrect_questions
+    )
+
     # Update result with final scores
     db.results.update_one(
         {"_id": result_id},
-        {"$set": {"score": score, "accuracy": accuracy, "focus_score": focus_score}}
+        {"$set": {
+            "score": score,
+            "accuracy": accuracy,
+            "focus_score": focus_score,
+            "personalized_suggestions": personalized_suggestions
+        }}
     )
 
     # Save Study Session
@@ -370,3 +383,83 @@ def process_quiz_submission(db, quiz: dict, submission, current_user: User):
     update_student_predictions(db, current_user)
 
     return {"result_id": result_id}
+
+def generate_personalized_suggestions(accuracy: float, subject: str, incorrect_questions: list) -> dict:
+    # 1. Performance-based suggestions
+    if accuracy < 40.0:
+        perf_suggestion = "Your performance indicates significant improvement is needed. Focus on fundamental concepts of this subject. Study 1-2 hours daily, revise previous topics, and practice beginner-level questions before attempting advanced quizzes."
+    elif accuracy <= 70.0:
+        perf_suggestion = "You have basic understanding of the subject. Strengthen weak topics identified in this quiz and solve additional practice questions. Allocate more time to revision and concept clarification."
+    else:
+        perf_suggestion = "Excellent performance. Continue practicing advanced-level questions and maintain consistency. Focus on mastering difficult concepts and preparing for higher-level assessments."
+
+    # 2. Subject-based suggestions
+    sub_key = subject.lower().replace(" ", "_")
+    subject_suggestions = []
+    if "machine_learning" in sub_key or "machine learning" in sub_key:
+        subject_suggestions = [
+            "Study supervised learning algorithms",
+            "Practice classification problems",
+            "Review model evaluation metrics"
+        ]
+    elif "competitive_programming" in sub_key or "competitive programming" in sub_key:
+        subject_suggestions = [
+            "Practice arrays and strings",
+            "Solve time complexity problems",
+            "Improve problem-solving speed"
+        ]
+    elif "java" in sub_key:
+        subject_suggestions = [
+            "OOP Concepts",
+            "Collections Framework",
+            "Exception Handling"
+        ]
+    elif "dbms" in sub_key or "database" in sub_key:
+        subject_suggestions = [
+            "SQL Queries",
+            "Normalization",
+            "Transactions"
+        ]
+    elif "compiler_design" in sub_key or "compiler design" in sub_key:
+        subject_suggestions = [
+            "Study lexical analysis and parsing algorithms",
+            "Review syntax-directed translation",
+            "Practice context-free grammar normalization"
+        ]
+    elif "computer_networks" in sub_key or "computer networks" in sub_key:
+        subject_suggestions = [
+            "Review OSI and TCP/IP models",
+            "Practice subnetting and routing algorithms",
+            "Study transport layer protocols"
+        ]
+    elif "internet_of_things" in sub_key or "iot" in sub_key:
+        subject_suggestions = [
+            "Study MQTT and CoAP protocols",
+            "Practice micro-controller interfacing",
+            "Review IoT sensor data flow"
+        ]
+    elif "development_engineering" in sub_key or "development engineering" in sub_key:
+        subject_suggestions = [
+            "Review CI/CD pipelines",
+            "Study software development life cycles",
+            "Practice version control using Git"
+        ]
+    else:
+        subject_suggestions = [
+            "Revise notes and lecture slides for this subject",
+            "Solve practice questions regularly",
+            "Clear doubts with your instructor"
+        ]
+
+    # 3. Topic-based suggestions
+    weak_topics = list(set(q.get("topic") for q in incorrect_questions if q.get("topic")))
+    topic_suggestions = []
+    for t in weak_topics:
+        topic_suggestions.append(f"Revise key concepts of {t}")
+
+    return {
+        "performance_suggestion": perf_suggestion,
+        "subject_suggestions": subject_suggestions,
+        "weak_topics": weak_topics,
+        "topic_suggestions": topic_suggestions
+    }

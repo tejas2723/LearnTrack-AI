@@ -15,7 +15,8 @@ import {
   User,
   BarChart3,
   MessageSquare,
-  Library
+  Library,
+  UserPlus
 } from "lucide-react";
 import api from "@/lib/api";
 
@@ -104,6 +105,7 @@ export default function Sidebar({ userRole: propRole, userName: propName }: Side
     } else if (role === "admin") {
       return [
         { href: "/admin/dashboard", label: "Dashboard", icon: <LayoutDashboard size={18} /> },
+        { href: "/admin/pending", label: "Pending Students", icon: <UserPlus size={18} /> },
         { href: "/admin/users", label: "Users", icon: <UserCheck size={18} /> },
         { href: "/admin/analytics", label: "Analytics", icon: <BarChart3 size={18} /> },
       ];

@@ -84,6 +84,7 @@ def seed_database(db_conn):
         "hashed_password": hashed_default_pwd,
         "full_name": "Dr. Sarah Jenkins",
         "role": "teacher",
+        "status": "Approved",
         "is_active": True,
         "created_at": datetime.now() - timedelta(days=30)
     })
@@ -95,6 +96,7 @@ def seed_database(db_conn):
         "hashed_password": hashed_default_pwd,
         "full_name": "System Admin",
         "role": "admin",
+        "status": "Approved",
         "is_active": True,
         "created_at": datetime.now() - timedelta(days=30)
     })
@@ -348,6 +350,7 @@ def seed_database(db_conn):
                 "predicted_score": predicted,
                 "risk_level": risk,
                 "preferred_style": pref_style,
+                "status": "Approved",
                 "is_active": True,
                 "created_at": created_date
             })

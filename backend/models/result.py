@@ -15,6 +15,7 @@ class Result(BaseModel):
     idle_time_seconds: int
     focus_score: int
     timestamp: datetime = Field(default_factory=datetime.now)
+    personalized_suggestions: Optional[dict] = None
 
     model_config = {
         "populate_by_name": True

@@ -12,14 +12,28 @@ import {
   BrainCircuit,
   Award,
   ChevronRight,
-  TrendingUp,
   ChevronDown,
   HelpCircle,
-  Star
+  Star,
+  BookOpen,
+  History,
+  GraduationCap,
+  AlertCircle
 } from "lucide-react";
 import api from "@/lib/api";
 import LayoutWrapper from "@/components/layout/LayoutWrapper";
-import { Card, CardHeader, CardTitle, CardContent, Button, Badge } from "@/components/ui";
+import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Select } from "@/components/ui";
+
+const SUBJECTS_KEYS: Record<string, string> = {
+  "compiler_design": "Compiler Design",
+  "computer_networks": "Computer Networks",
+  "machine_learning": "Machine Learning",
+  "internet_of_things": "Internet of Things",
+  "development_engineering": "Development Engineering",
+  "competitive_programming": "Competitive Programming",
+  "java": "Java",
+  "dbms": "DBMS"
+};
 
 function ResultsContent() {
   const router = useRouter();
@@ -28,38 +42,34 @@ function ResultsContent() {
   
   const [student, setStudent] = useState<any>(null);
   const [result, setResult] = useState<any>(null);
+  const [history, setHistory] = useState<any[]>([]);
+  const [subjectFilter, setSubjectFilter] = useState("All");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [expandedQuestions, setExpandedQuestions] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     async function loadData() {
-      if (!resultId) {
-        router.push("/student/dashboard");
-        return;
-      }
       try {
         const userRes = await api.get("/auth/me");
         setStudent(userRes.data);
-      } catch (err) {
-        // 401 handled globally → redirects to login
-        console.error("Auth failed:", err);
-        setLoading(false);
-        return;
-      }
-      try {
-        const res = await api.get(`/results/${resultId}`);
-        setResult(res.data);
+        
+        if (resultId) {
+          const res = await api.get(`/results/${resultId}`);
+          setResult(res.data);
+        } else {
+          const res = await api.get("/results/my-history");
+          setHistory(res.data);
+        }
       } catch (err: any) {
-        console.error("Failed to load quiz results:", err);
-        setLoadError("Could not load your results. Please go back to the dashboard and try again.");
+        console.error("Failed to load results data:", err);
+        setLoadError("Could not load your quiz records. Please try again.");
       } finally {
         setLoading(false);
       }
     }
     loadData();
   }, [resultId, router]);
-
 
   if (loading) {
     return (
@@ -69,7 +79,133 @@ function ResultsContent() {
     );
   }
 
-  if (!student || !result) return null;
+  if (!student) return null;
+
+  const getPerformanceBadgeVariant = (level: string) => {
+    switch (level.toLowerCase()) {
+      case "high":
+        return "success";
+      case "medium":
+        return "warning";
+      case "low":
+        return "danger";
+      default:
+        return "neutral";
+    }
+  };
+
+  // 1. Render Quiz History list
+  if (!resultId) {
+    const filteredHistory = history.filter(h => {
+      if (subjectFilter === "All") return true;
+      return h.subject === subjectFilter;
+    });
+
+    return (
+      <LayoutWrapper userRole={student.role} userName={student.full_name}>
+        
+        {/* Header */}
+        <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-2">
+              <History size={30} className="text-indigo-650" />
+              Quiz Attempt History
+            </h1>
+            <p className="text-sm text-slate-500 mt-1">
+              View your past academic quiz attempts, percentage scores, and performance levels.
+            </p>
+          </div>
+          <Link href="/student/quiz">
+            <Button className="w-fit flex items-center gap-2">
+              <BookOpen size={16} />
+              Take New Quiz
+            </Button>
+          </Link>
+        </div>
+
+        {loadError && (
+          <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2 shadow-sm">
+            <AlertCircle size={18} className="text-rose-600" />
+            <span>{loadError}</span>
+          </div>
+        )}
+
+        {/* Filters bar */}
+        <Card className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-6 flex flex-wrap gap-4 items-center justify-between">
+          <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            Total Completed Quizzes: <span className="text-indigo-600 font-extrabold text-sm">{filteredHistory.length}</span>
+          </div>
+          <div className="w-48">
+            <Select value={subjectFilter} onChange={(e) => setSubjectFilter(e.target.value)}>
+              <option value="All">All Subjects</option>
+              {Object.entries(SUBJECTS_KEYS).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </Select>
+          </div>
+        </Card>
+
+        {/* History table */}
+        <Card className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold select-none">
+                  <th className="p-4">Subject Name</th>
+                  <th className="p-4">Date & Time</th>
+                  <th className="p-4 text-center">Score</th>
+                  <th className="p-4 text-center">Percentage</th>
+                  <th className="p-4 text-center">Performance Level</th>
+                  <th className="p-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredHistory.length > 0 ? (
+                  filteredHistory.map((item) => (
+                    <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                      <td className="p-4 font-bold text-slate-800">
+                        {SUBJECTS_KEYS[item.subject] || item.subject.replace("_", " ").toUpperCase()}
+                      </td>
+                      <td className="p-4 text-slate-400 font-medium">
+                        {new Date(item.timestamp).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
+                      </td>
+                      <td className="p-4 text-center text-slate-600 font-semibold">
+                        {item.score} / {item.total_questions}
+                      </td>
+                      <td className="p-4 text-center font-extrabold text-indigo-650">
+                        {Math.round(item.accuracy)}%
+                      </td>
+                      <td className="p-4 text-center">
+                        <Badge variant={getPerformanceBadgeVariant(item.performance_level)}>
+                          {item.performance_level}
+                        </Badge>
+                      </td>
+                      <td className="p-4 text-right">
+                        <Link href={`/student/results?id=${item.id}`}>
+                          <Button variant="outline" className="text-[10px] font-bold py-1 px-3 h-8 shadow-sm">
+                            View Details
+                          </Button>
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-slate-400 font-medium">
+                      No quiz attempts found matching the criteria.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </LayoutWrapper>
+    );
+  }
+
+  // 2. Render Single Result details
+  if (!result) return null;
 
   const correctAnswers = result.score;
   const incorrectAnswers = result.total_questions - result.score;
@@ -96,11 +232,11 @@ function ResultsContent() {
       
       {/* Navigation header */}
       <Link 
-        href="/student/dashboard"
-        className="inline-flex items-center gap-2 text-slate-400 hover:text-slate-655 text-sm mb-6 transition-colors font-semibold"
+        href="/student/results"
+        className="inline-flex items-center gap-2 text-slate-450 hover:text-slate-655 text-sm mb-6 transition-colors font-semibold"
       >
         <ArrowLeft size={16} />
-        Back to Dashboard
+        Back to Quiz History
       </Link>
 
       <div className="max-w-3xl mx-auto space-y-8">
@@ -168,7 +304,7 @@ function ResultsContent() {
                   <div className="text-2xl font-extrabold text-indigo-650 mt-1">{Math.round(result.ai_insights.predicted_score)}%</div>
                 </div>
                 <div className="p-2 bg-indigo-100/40 text-indigo-600 rounded-full">
-                  <TrendingUp size={20} />
+                  <Star size={20} />
                 </div>
               </div>
 
@@ -195,7 +331,7 @@ function ResultsContent() {
                   result.ai_insights.weak_topics.map((wt: string, idx: number) => (
                     <span 
                       key={idx} 
-                      className="px-3 py-1.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 text-xs font-semibold flex items-center gap-1.5"
+                      className="px-3 py-1.5 rounded-lg border border-rose-205 bg-rose-50 text-rose-700 text-xs font-semibold flex items-center gap-1.5 animate-pulse"
                     >
                       <AlertTriangle size={12} className="text-rose-500" />
                       <span>{wt}</span>
@@ -208,6 +344,57 @@ function ResultsContent() {
                 )}
               </div>
             </div>
+
+            {/* Personalized Recommendations */}
+            {result.personalized_suggestions && (
+              <div className="space-y-4 border-t border-slate-100 pt-5">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                  Personalized Study Recommendations
+                </span>
+                
+                {/* Performance feedback */}
+                <div className={`p-4 rounded-xl border leading-relaxed text-xs font-medium ${
+                  result.accuracy > 70 
+                    ? "bg-emerald-50 border-emerald-100 text-emerald-800" 
+                    : result.accuracy >= 40 
+                    ? "bg-amber-50 border-amber-105 text-amber-800" 
+                    : "bg-rose-50 border-rose-100 text-rose-805"
+                }`}>
+                  <span className="font-extrabold uppercase text-[10px] block mb-1">Performance Feedback:</span>
+                  {result.personalized_suggestions.performance_suggestion}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Subject-Based Suggestions */}
+                  {result.personalized_suggestions.subject_suggestions && result.personalized_suggestions.subject_suggestions.length > 0 && (
+                    <div className="p-4 rounded-xl border border-slate-150 bg-slate-50/50">
+                      <span className="font-extrabold text-[10px] text-slate-400 uppercase tracking-wider block mb-2">
+                        Subject-Specific suggestions
+                      </span>
+                      <ul className="list-disc pl-4 space-y-1.5 text-xs text-slate-655 font-semibold">
+                        {result.personalized_suggestions.subject_suggestions.map((sug: string, idx: number) => (
+                          <li key={idx}>{sug}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Topic-Based Suggestions */}
+                  {result.personalized_suggestions.topic_suggestions && result.personalized_suggestions.topic_suggestions.length > 0 && (
+                    <div className="p-4 rounded-xl border border-slate-150 bg-slate-50/50">
+                      <span className="font-extrabold text-[10px] text-slate-400 uppercase tracking-wider block mb-2">
+                        Suggested Topics to Revise
+                      </span>
+                      <ul className="list-disc pl-4 space-y-1.5 text-xs text-slate-655 font-semibold">
+                        {result.personalized_suggestions.topic_suggestions.map((sug: string, idx: number) => (
+                          <li key={idx}>{sug}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Recommendations */}
             <div className="space-y-3 border-t border-slate-100 pt-5">
@@ -277,7 +464,7 @@ function ResultsContent() {
                             Question {idx + 1}: {att.question_text}
                           </p>
                           <div className="flex flex-wrap gap-2 items-center mt-1.5 text-[9px] font-bold text-slate-450 uppercase">
-                            <span className="bg-slate-100 border border-slate-200 text-slate-500 px-1.5 py-0.5 rounded">
+                            <span className="bg-slate-105 border border-slate-200 text-slate-500 px-1.5 py-0.5 rounded">
                               {att.is_correct ? "Correct" : "Incorrect"}
                             </span>
                             <span>•</span>
@@ -370,8 +557,8 @@ function ResultsContent() {
 
         {/* Dashboard button */}
         <div className="text-center pt-2">
-          <Link href="/student/dashboard">
-            <Button className="w-full sm:w-48">Back to Dashboard</Button>
+          <Link href="/student/results">
+            <Button className="w-full sm:w-48">Back to Quiz History</Button>
           </Link>
         </div>
 

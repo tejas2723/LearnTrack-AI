@@ -14,6 +14,7 @@ class UserBase(BaseModel):
     attendance_percentage: Optional[float] = None
     skills: Optional[list[str]] = None
     learning_interests: Optional[list[str]] = None
+    status: Optional[str] = "Approved"
 
 class UserCreate(UserBase):
     password: str

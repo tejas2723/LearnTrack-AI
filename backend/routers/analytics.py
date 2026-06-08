@@ -157,6 +157,48 @@ def get_student_analytics(
         for sub, score in sorted_performance[:3]
     ]
 
+    # Strong and Weak Subjects
+    strong_subjects = []
+    weak_subjects = []
+    for sub, score in subject_performance.items():
+        display_name = SUBJECTS_KEYS.get(sub, sub.replace("_", " ").title())
+        if score >= 70.0:
+            strong_subjects.append({"subject": display_name, "score": round(score, 1)})
+        else:
+            weak_subjects.append({"subject": display_name, "score": round(score, 1)})
+
+    # Latest Quiz Suggestions
+    latest_result = db.results.find_one(
+        {"student_id": student.id},
+        sort=[("timestamp", -1)]
+    )
+    latest_quiz_suggestions = latest_result.get("personalized_suggestions") if latest_result else None
+
+    # Recent Quiz Activity (last 5 attempts)
+    recent_results = list(db.results.find({"student_id": student.id}).sort("timestamp", -1).limit(5))
+    recent_activity = []
+    for r in recent_results:
+        quiz = db.quizzes.find_one({"_id": r["quiz_id"]}) or {}
+        accuracy = r.get("accuracy", 0.0)
+        if accuracy > 70.0:
+            perf_level = "High"
+        elif accuracy >= 40.0:
+            perf_level = "Medium"
+        else:
+            perf_level = "Low"
+            
+        recent_activity.append({
+            "id": r["_id"],
+            "quiz_id": r["quiz_id"],
+            "quiz_title": quiz.get("title", "Unknown Quiz"),
+            "subject": SUBJECTS_KEYS.get(quiz.get("subject", ""), quiz.get("subject", "").replace("_", " ").title()),
+            "timestamp": r.get("timestamp"),
+            "score": r.get("score", 0),
+            "total_questions": r.get("total_questions", 0),
+            "accuracy": accuracy,
+            "performance_level": perf_level
+        })
+
     # 6. Personalized Recommendations
     recommendations_list = _build_recommendations(sorted_performance)
 
@@ -172,6 +214,10 @@ def get_student_analytics(
         "predicted_exam_score": round(predicted_exam_score, 1),
         "score_trend": score_trend,
         "weak_topics": weak_topics,
+        "strong_subjects": strong_subjects,
+        "weak_subjects": weak_subjects,
+        "latest_quiz_suggestions": latest_quiz_suggestions,
+        "recent_activity": recent_activity,
         "recommendations": recommendations_list,
         "best_study_time": best_time_clean
     }

@@ -11,7 +11,9 @@ import {
   ArrowRight,
   TrendingUp,
   Activity,
-  UserCheck
+  UserCheck,
+  X,
+  AlertTriangle
 } from "lucide-react";
 import { 
   LineChart, 
@@ -36,6 +38,7 @@ export default function AdminDashboard() {
   const [admin, setAdmin] = useState<any>(null);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedRiskCategory, setSelectedRiskCategory] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -95,31 +98,62 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* KPI Cards (5 Columns) */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-        <Card className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Users</span>
-          <h3 className="text-2xl font-extrabold text-slate-850 mt-1.5">{stats.total_users}</h3>
-        </Card>
-
+      {/* KPI Cards (6 Columns) */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
         <Card className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Students</span>
-          <h3 className="text-2xl font-extrabold text-slate-850 mt-1.5 text-indigo-600">{stats.total_students}</h3>
+          <h3 className="text-2xl font-extrabold text-indigo-650 mt-1.5">{stats.total_students}</h3>
         </Card>
 
         <Card className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Teachers</span>
-          <h3 className="text-2xl font-extrabold text-slate-850 mt-1.5 text-emerald-600">{stats.total_teachers}</h3>
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Approved Students</span>
+          <h3 className="text-2xl font-extrabold text-emerald-600 mt-1.5">{stats.approved_students}</h3>
         </Card>
 
-        <Card className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Quizzes</span>
-          <h3 className="text-2xl font-extrabold text-slate-850 mt-1.5">{stats.total_quizzes}</h3>
+        <Card 
+          className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 cursor-pointer hover:border-indigo-500 hover:shadow-md transition-all group"
+          onClick={() => router.push("/admin/pending")}
+        >
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block group-hover:text-indigo-600 transition-colors">Pending Approvals</span>
+          <h3 className="text-2xl font-extrabold text-amber-600 mt-1.5 flex items-center justify-between">
+            <span>{stats.pending_approvals}</span>
+            {stats.pending_approvals > 0 && (
+              <Badge variant="warning" className="animate-pulse text-[9px] px-1.5 py-0.5">Action</Badge>
+            )}
+          </h3>
         </Card>
 
-        <Card className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 col-span-2 md:col-span-1">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Avg Platform Score</span>
-          <h3 className="text-2xl font-extrabold text-slate-855 mt-1.5 text-amber-600">{stats.avg_platform_score}%</h3>
+        <Card 
+          className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 cursor-pointer hover:border-rose-500 hover:shadow-md transition-all group"
+          onClick={() => setSelectedRiskCategory("High")}
+        >
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block group-hover:text-rose-600 transition-colors">High Risk Students</span>
+          <h3 className="text-2xl font-extrabold text-rose-600 mt-1.5 flex items-center justify-between">
+            <span>{stats.high_risk_count}</span>
+            <AlertTriangle size={14} className="text-rose-450 opacity-60" />
+          </h3>
+        </Card>
+
+        <Card 
+          className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 cursor-pointer hover:border-amber-500 hover:shadow-md transition-all group"
+          onClick={() => setSelectedRiskCategory("Medium")}
+        >
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block group-hover:text-amber-600 transition-colors">Medium Risk Students</span>
+          <h3 className="text-2xl font-extrabold text-amber-600 mt-1.5 flex items-center justify-between">
+            <span>{stats.medium_risk_count}</span>
+            <AlertTriangle size={14} className="text-amber-450 opacity-60" />
+          </h3>
+        </Card>
+
+        <Card 
+          className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 cursor-pointer hover:border-emerald-500 hover:shadow-md transition-all group"
+          onClick={() => setSelectedRiskCategory("Low")}
+        >
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block group-hover:text-emerald-600 transition-colors">Low Risk Students</span>
+          <h3 className="text-2xl font-extrabold text-emerald-600 mt-1.5 flex items-center justify-between">
+            <span>{stats.low_risk_count}</span>
+            <Award size={14} className="text-emerald-450 opacity-60" />
+          </h3>
         </Card>
       </div>
 
@@ -218,6 +252,97 @@ export default function AdminDashboard() {
           </table>
         </div>
       </Card>
+
+      {/* Risk Category Modal */}
+      {selectedRiskCategory && (() => {
+        const getRiskStudentsList = () => {
+          if (selectedRiskCategory === "High") return stats.high_risk_students || [];
+          if (selectedRiskCategory === "Medium") return stats.medium_risk_students || [];
+          if (selectedRiskCategory === "Low") return stats.low_risk_students || [];
+          return [];
+        };
+        const riskStudents = getRiskStudentsList();
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="w-full max-w-4xl bg-white rounded-xl shadow-2xl border border-slate-200 p-6 relative max-h-[85vh] flex flex-col">
+              <button 
+                onClick={() => setSelectedRiskCategory(null)}
+                className="absolute right-4 top-4 p-1 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+              >
+                <X size={18} />
+              </button>
+
+              <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <span className={`w-3.5 h-3.5 rounded-full ${
+                  selectedRiskCategory === "High" 
+                    ? "bg-rose-500 animate-pulse" 
+                    : selectedRiskCategory === "Medium" 
+                    ? "bg-amber-500" 
+                    : "bg-emerald-500"
+                }`}></span>
+                {selectedRiskCategory} Risk Academic Profile Students ({riskStudents.length})
+              </h3>
+
+              <div className="overflow-y-auto flex-1 min-h-0 border border-slate-100 rounded-lg">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold select-none sticky top-0">
+                      <th className="p-3">Student Name</th>
+                      <th className="p-3">Email</th>
+                      <th className="p-3">Department</th>
+                      <th className="p-3 text-center">Quiz Attempts</th>
+                      <th className="p-3 text-center">Average Score</th>
+                      <th className="p-3 text-center">Risk Level</th>
+                      <th className="p-3">Weak Subjects</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {riskStudents.length > 0 ? (
+                      riskStudents.map((stud: any) => (
+                        <tr key={stud.id} className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                          <td className="p-3 font-bold text-slate-800">{stud.name}</td>
+                          <td className="p-3 text-slate-500 font-medium select-all">{stud.email}</td>
+                          <td className="p-3 font-semibold text-slate-600">{stud.department}</td>
+                          <td className="p-3 text-center text-slate-500 font-bold">{stud.attempts_count}</td>
+                          <td className="p-3 text-center font-extrabold text-slate-805">{stud.avg_score}%</td>
+                          <td className="p-3 text-center">
+                            <Badge variant={stud.risk_level === "High" ? "danger" : stud.risk_level === "Medium" ? "warning" : "success"}>
+                              {stud.risk_level}
+                            </Badge>
+                          </td>
+                          <td className="p-3">
+                            <div className="flex flex-wrap gap-1 max-w-xs">
+                              {stud.weak_subjects && stud.weak_subjects.length > 0 ? (
+                                stud.weak_subjects.map((ws: string, idx: number) => (
+                                  <span key={idx} className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 text-[10px] font-bold border border-rose-100">
+                                    {ws}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-emerald-600 text-[10px] font-bold">None</span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="p-8 text-center text-slate-400 font-medium">
+                          No students categorized in this risk level.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex justify-end mt-4">
+                <Button onClick={() => setSelectedRiskCategory(null)} className="w-28">Close</Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
     </LayoutWrapper>
   );
